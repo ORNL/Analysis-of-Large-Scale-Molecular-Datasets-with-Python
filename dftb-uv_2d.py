@@ -28,19 +28,23 @@ from rdkit.Chem import AllChem
 
 plt.rcParams.update({'font.size': 22})
 
+planck_constant = 4.1357 * 1e-15 # eV s
+light_speed = 299792458 # m / s
+meter_to_nanometer_conversion = 1e+9
+
 # global constants
 found_uv_section = False  # check for uv data in out
 specstring_start = ''  # check orca.out from here
 specstring_end = ''  # stop reading orca.out from here
 w_wn = 1.0  # w = line width for broadening - wave numbers, FWHM
-w_nm = 1  # w = line width for broadening - nm, FWHM
+w_nm = 10.0  # w = line width for broadening - nm, FWHM
 export_delim = " "  # delimiter for data export
 
 # parameters to discretize the spectrum
 spectrum_discretization_step = 0.2
 
 # plot config section - configure here
-nm_plot = False  # wavelength plot /nm if True, if False wave number plot /cm-1
+nm_plot = True  # wavelength plot in nm if True, if False energy plot in eV
 show_single_gauss = True  # show single gauss functions if True
 show_single_gauss_area = True  # show single gauss functions - area plot if True
 show_conv_spectrum = True  # show the convoluted spectra if True (if False peak labels will not be shown)
@@ -52,9 +56,12 @@ linear_locator = False  # tick locations at the beginning and end of the spectru
 spectrum_title = "Absorption spectrum"  # title
 spectrum_title_weight = "bold"  # weight of the title font: 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight'
 y_label = "intensity"  # label of y-axis
-x_label_wn = r'energy /cm$^{-1}$'  # label of the x-axis - wave number
-x_label_nm = r'$\lambda$ /nm'  # label of the x-axis - nm
+x_label_eV = r'energy (eV)$'  # label of the x-axis - wave number
+x_label_nm = r'wavelength (nm)'  # label of the x-axis - nm
 figure_dpi = 300  # DPI of the picture
+
+def convert_ev_in_nm(ev_value):
+    return 1 / ev_value * planck_constant * light_speed * meter_to_nanometer_conversion
 
 from mpi4py import MPI
 
@@ -88,7 +95,7 @@ def gauss(a, m, x, w):
     # calculation of the Gaussian line shape
     # a = amplitude (max y, intensity)
     # x = position
-    # m = maximum/meadian (stick position in x, wave number)
+    # m = maximum/median (stick position in x, wave number)
     # w = line width, FWHM
     return a * np.exp(-(np.log(2) * ((m - x) / w) ** 2))
 
@@ -107,9 +114,9 @@ parser.add_argument('-n', '--nosave',
                     help='do not save the spectrum')
 
 # plot the wave number spectrum
-parser.add_argument('-pwn', '--plotwn',
+parser.add_argument('-peV', '--ploteV',
                     default=1, action='store_false',
-                    help='plot the wave number spectrum')
+                    help='plot the energy spectrum')
 
 # change line with (integer) for line broadening - nm
 parser.add_argument('-wnm', '--linewidth_nm',
@@ -117,21 +124,21 @@ parser.add_argument('-wnm', '--linewidth_nm',
                     default=1,
                     help='line width for broadening - wavelength in nm')
 
-# change line with (integer) for line broadening - wn
-parser.add_argument('-wwn', '--linewidth_wn',
+# change line with (integer) for line broadening - energy
+parser.add_argument('-weV', '--linewidth_eV',
                     type=int,
                     default=10,
-                    help='line width for broadening - wave number in cm**-1')
+                    help='line width for broadening - energy in eV')
 
 # individual x range - start
 parser.add_argument('-x0', '--startx',
                     type=int,
-                    help='start spectrum at x nm or cm**-1')
+                    help='start spectrum at x nm or eV')
 
 # individual x range - end
 parser.add_argument('-x1', '--endx',
                     type=int,
-                    help='end spectrum at x nm or cm**-1')
+                    help='end spectrum at x nm or eV')
 
 # export data for the line spectrum in a csv-like fashion
 parser.add_argument('-e', '--export',
@@ -157,7 +164,7 @@ max_energy = float('-inf')
 
 # nm_plot = args.plotwn
 
-def find_energy_extremes(path, min_energy, max_energy):
+def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
     comm.Barrier()
     if comm_rank == 0:
         print("="*50, flush=True)
@@ -177,7 +184,7 @@ def find_energy_extremes(path, min_energy, max_energy):
         # collect information about molecular structure and chemical composition
         spectrum_file = path + '/' + dir + '/' + '/' + 'EXC.DAT'
         if os.path.exists(spectrum_file):
-            energylist = list()  # energy cm-1
+            energylist = list()  # energy eV
             # open a file
             # check existence
             try:
@@ -202,20 +209,24 @@ def find_energy_extremes(path, min_energy, max_energy):
                 print(f"'{spectrum_file}'" + " not found", flush=True)
                 sys.exit(1)
 
-    return min_energy, max_energy
+    return min_energy, max_energy, convert_ev_in_nm(max_energy), convert_ev_in_nm(min_energy)
 
 
 
 
-def smooth_spectrum(path, min_energy, max_energy):
-    xmin_spectrum = min(0.0, min_energy)
-    xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
+def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength):
+    if nm_plot:
+        xmin_spectrum = min(0.0, min_wavelength)
+        xmax_spectrum = math.ceil(max_wavelength) + spectrum_discretization_step
+    else:
+        xmin_spectrum = min(0.0, min_energy)
+        xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
 
     # global lists
     statelist = list()  # mode
-    energylist = list()  # energy cm-1
+    energylist = list()  # energy eV
     intenslist = list()  # fosc
-    gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum for cm-1
+    gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum
 
     spectrum_file = path + '/' + 'EXC.DAT'
 
@@ -257,9 +268,10 @@ def smooth_spectrum(path, min_energy, max_energy):
 
     if nm_plot:
         # convert wave number to nm for nm plot
-        energylist = [1 / wn * 10 ** 7 for wn in energylist]
+        valuelist = [convert_ev_in_nm(value) for value in energylist]
         w = w_nm  # use line width for nm axis
     else:
+        valuelist = energylist
         w = w_wn  # use line width for wave number axis
 
     # prepare plot
@@ -270,7 +282,7 @@ def smooth_spectrum(path, min_energy, max_energy):
 
     # plot single gauss function for every frequency freq
     # generate summation of single gauss functions
-    for index, wn in enumerate(energylist):
+    for index, wn in enumerate(valuelist):
         # single gauss function line plot
         if show_single_gauss:
             ax.plot(plt_range_x, gauss(intenslist[index], plt_range_x, wn, w), color="grey", alpha=0.5)
@@ -292,7 +304,7 @@ def smooth_spectrum(path, min_energy, max_energy):
 
     # plot sticks
     if show_sticks:
-        ax.stem(energylist, intenslist, linefmt="dimgrey", markerfmt=" ", basefmt=" ")
+        ax.stem(valuelist, intenslist, linefmt="dimgrey", markerfmt=" ", basefmt=" ")
 
     # optional mark peaks - uncomment in case
     # ax.plot(peaks,plt_range_gauss_sum_y_wn[peaks],"x")
@@ -310,7 +322,7 @@ def smooth_spectrum(path, min_energy, max_energy):
     if nm_plot:
         ax.set_xlabel(x_label_nm)
     else:
-        ax.set_xlabel(x_label_wn)
+        ax.set_xlabel(x_label_eV)
 
     ax.set_ylabel(y_label)  # label y axis
     ax.set_title("Absorption spectrum " + smiles_string, fontweight=spectrum_title_weight)  # title
@@ -368,7 +380,7 @@ def smooth_spectrum(path, min_energy, max_energy):
     plt.close(fig)
 
 
-def smooth_spectra(path, min_energy, max_energy):
+def smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength):
     comm.Barrier()
     if comm_rank == 0:
         print("="*50, flush=True)
@@ -388,7 +400,7 @@ def smooth_spectra(path, min_energy, max_energy):
         print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total-count, flush=True)
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + '/' + dir + '/' + 'EXC.DAT'):
-            smooth_spectrum(path + '/' + dir, min_energy, max_energy)
+            smooth_spectrum(path + '/' + dir, min_energy, max_energy, min_wavelength, max_wavelength)
 
 def draw_2Dmols(path):
     comm.Barrier()
@@ -436,12 +448,14 @@ def draw_2Dmol(path):
 
 
 if __name__ == '__main__':
-    path = '../dftb_gdb9_electronic_excitation_spectrum'
-    min_energy, max_energy = find_energy_extremes(path, min_energy, max_energy)
+    path = '/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/dftb_gdb9_smooth_spectrum'
+    min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy, max_energy)
     min_energy = comm.allreduce(min_energy, op=MPI.MIN)
     max_energy = comm.allreduce(max_energy, op=MPI.MAX)
+    min_wavelength = comm.allreduce(min_wavelength, op=MPI.MIN)
+    max_wavelength = comm.allreduce(max_wavelength, op=MPI.MAX)
     draw_2Dmols(path)
-    smooth_spectra(path, min_energy, max_energy)
+    smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
     
     print("Rank ", comm_rank, " done.", flush=True)
     comm.Barrier()
