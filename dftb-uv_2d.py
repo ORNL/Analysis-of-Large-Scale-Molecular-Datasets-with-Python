@@ -37,7 +37,7 @@ found_uv_section = False  # check for uv data in out
 specstring_start = ''  # check orca.out from here
 specstring_end = ''  # stop reading orca.out from here
 w_wn = 1.0  # w = line width for broadening - wave numbers, FWHM
-w_nm = 10.0  # w = line width for broadening - nm, FWHM
+w_nm = 80.0  # w = line width for broadening - nm, FWHM
 export_delim = " "  # delimiter for data export
 
 # parameters to discretize the spectrum
@@ -216,8 +216,8 @@ def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
 
 def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength):
     if nm_plot:
-        xmin_spectrum = min(0.0, min_wavelength)
-        xmax_spectrum = math.ceil(max_wavelength) + spectrum_discretization_step
+        xmin_spectrum = 100
+        xmax_spectrum = 800
     else:
         xmin_spectrum = min(0.0, min_energy)
         xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
@@ -284,6 +284,8 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
     # generate summation of single gauss functions
     for index, wn in enumerate(valuelist):
         # single gauss function line plot
+        if nm_plot and not (xmin_spectrum <= valuelist[index] <= xmax_spectrum):
+            break
         if show_single_gauss:
             ax.plot(plt_range_x, gauss(intenslist[index], plt_range_x, wn, w), color="grey", alpha=0.5)
             # single gauss function filled plot
@@ -304,7 +306,12 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
 
     # plot sticks
     if show_sticks:
-        ax.stem(valuelist, intenslist, linefmt="dimgrey", markerfmt=" ", basefmt=" ")
+        if nm_plot:
+            selected_indices = [index for index, value in enumerate(valuelist) if
+                                (xmin_spectrum <= valuelist[index] <= xmax_spectrum)]
+            ax.stem([valuelist[index] for index in selected_indices], [intenslist[index] for index in selected_indices], linefmt="dimgrey", markerfmt=" ", basefmt=" ")
+        else:
+            ax.stem(valuelist, intenslist, linefmt="dimgrey", markerfmt=" ", basefmt=" ")
 
     # optional mark peaks - uncomment in case
     # ax.plot(peaks,plt_range_gauss_sum_y_wn[peaks],"x")
@@ -448,7 +455,7 @@ def draw_2Dmol(path):
 
 
 if __name__ == '__main__':
-    path = '/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/dftb_gdb9_smooth_spectrum'
+    path = './dftb_gdb9_smooth_spectrum'
     min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy, max_energy)
     min_energy = comm.allreduce(min_energy, op=MPI.MIN)
     max_energy = comm.allreduce(max_energy, op=MPI.MAX)
