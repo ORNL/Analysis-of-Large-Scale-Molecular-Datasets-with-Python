@@ -67,12 +67,12 @@ def generate_plot(path):
 
                     except IOError:
                         print("Error Reading HOMO-LUMO for Molecule " + dir, flush=True)
-                        sys.exit(1)
+                        pass
 
             # file not found -> exit here
             except IOError:
                 print(f"'{spectrum_file}'" + " not found", flush=True)
-                sys.exit(1)
+                pass
 
             homo_lumo_gap_list.append(homo_lumo_gap)
             minimum_absorption_energy = energylist[0]
