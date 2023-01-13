@@ -20,11 +20,6 @@ def generate_plot(path):
     homo_lumo_gap_list = []
 
     comm.Barrier()
-    if comm_rank == 0:
-        print("=" * 50, flush=True)
-        print("Selecting molecules that satisfy desired criteria", flush=True)
-        print("=" * 50, flush=True)
-    comm.Barrier()
 
     dirs = None
     if comm_rank == 0:
@@ -89,10 +84,10 @@ def generate_plot(path):
     homo_lumo_gap_list_all = comm.gather(homo_lumo_gap_list, root=0)
     minimum_absorption_energy_list_all = comm.gather(minimum_absorption_energy_list, root=0)
 
-    flattened_homo_lumo_gap_list_all = flatten(homo_lumo_gap_list_all)
-    flattened_minimum_absorption_energy_list_all = flatten(minimum_absorption_energy_list_all)
-
     if comm_rank == 0:
+
+        flattened_homo_lumo_gap_list_all = flatten(homo_lumo_gap_list_all)
+        flattened_minimum_absorption_energy_list_all = flatten(minimum_absorption_energy_list_all)
 
         min_value = min( min(flattened_homo_lumo_gap_list_all), min(flattened_minimum_absorption_energy_list_all) )
         max_value = max( max(flattened_homo_lumo_gap_list_all), max(flattened_minimum_absorption_energy_list_all) )
