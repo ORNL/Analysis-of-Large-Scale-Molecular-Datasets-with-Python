@@ -1,5 +1,7 @@
 import numpy as np  # summation
 
+def flatten(l):
+    return [item for sublist in l for item in sublist]
 
 def nsplit(a, n):
     k, m = divmod(len(a), n)
