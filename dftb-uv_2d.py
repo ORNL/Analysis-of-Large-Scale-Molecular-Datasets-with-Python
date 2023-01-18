@@ -17,8 +17,11 @@ import os  # os file processing
 import re  # regular expressions
 import argparse  # argument parser
 import numpy as np  # summation
+from mpi4py import MPI
 import math
 import matplotlib.pyplot as plt  # plots
+from matplotlib.offsetbox import (OffsetImage, AnnotationBbox)
+import matplotlib.image as image
 from scipy.signal import find_peaks  # peak detection
 
 from rdkit.Chem.rdmolops import RemoveAllHs
@@ -35,15 +38,15 @@ light_speed = 299792458  # m / s
 meter_to_nanometer_conversion = 1e+9
 
 # global constants
-found_uv_section = False  # check for uv data in out
+found_uv_section = True  # check for uv data in out
 specstring_start = ''  # check orca.out from here
 specstring_end = ''  # stop reading orca.out from here
-w_wn = 1.0  # w = line width for broadening - wave numbers, FWHM
-w_nm = 80.0  # w = line width for broadening - nm, FWHM
+w_eV = 0.5  # w = line width for broadening - eV, FWHM
+w_nm = 10.0  # w = line width for broadening - nm, FWHM
 export_delim = " "  # delimiter for data export
 
 # parameters to discretize the spectrum
-spectrum_discretization_step = 0.2
+#spectrum_discretization_step = 0.2
 
 # plot config section - configure here
 nm_plot = True  # wavelength plot in nm if True, if False energy plot in eV
@@ -58,16 +61,15 @@ linear_locator = False  # tick locations at the beginning and end of the spectru
 spectrum_title = "Absorption spectrum"  # title
 spectrum_title_weight = "bold"  # weight of the title font: 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight'
 y_label = "intensity"  # label of y-axis
-x_label_eV = r'energy (eV)$'  # label of the x-axis - wave number
+x_label_eV = r'energy (eV)'  # label of the x-axis - eV
 x_label_nm = r'wavelength (nm)'  # label of the x-axis - nm
-figure_dpi = 300  # DPI of the picture
+figure_dpi = 100  # DPI of the picture
 
 
 def convert_ev_in_nm(ev_value):
     return 1 / ev_value * planck_constant * light_speed * meter_to_nanometer_conversion
 
 
-from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 comm_size = comm.Get_size()
@@ -188,9 +190,13 @@ def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
 
 def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength):
     if nm_plot:
-        xmin_spectrum = 100
-        xmax_spectrum = 800
+        spectrum_discretization_step = 0.02
+        xmin_spectrum = min(0.0, min_wavelength)
+        xmax_spectrum = math.ceil(max_wavelength) + spectrum_discretization_step
+        #xmin_spectrum = 100
+        xmax_spectrum = 750
     else:
+        spectrum_discretization_step = 0.01
         xmin_spectrum = min(0.0, min_energy)
         xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
 
@@ -244,7 +250,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
         w = w_nm  # use line width for nm axis
     else:
         valuelist = energylist
-        w = w_wn  # use line width for wave number axis
+        w = w_eV  # use line width for eV axis
 
     # prepare plot
     fig, ax = plt.subplots()
@@ -274,6 +280,11 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
 
     # plot spectra
     if show_conv_spectrum:
+        filename, file_extension = os.path.splitext(path)
+        mol2d_im = image.imread(f"{filename}/mol_2d_drawing.png")
+        imagebox = OffsetImage(mol2d_im,zoom=0.5)
+        ab = AnnotationBbox(imagebox, (max(plt_range_x)*0.8,max(plt_range_gauss_sum_y)*0.6), frameon = True)
+        ax.add_artist(ab)
         ax.plot(plt_range_x, plt_range_gauss_sum_y, color="black", linewidth=0.8)
 
     # plot sticks
@@ -333,7 +344,13 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
     # save the plot
     if save_spectrum:
         filename, file_extension = os.path.splitext(path)
-        plt.savefig(f"{filename}/abs_spectrum.png", dpi=figure_dpi)
+
+        if nm_plot:
+            #plt.xlim(60,500)
+            plt.savefig(f"{filename}/abs_spectrum_nm.png", dpi=figure_dpi)
+        else:
+            #plt.xlim(2.50,15)
+            plt.savefig(f"{filename}/abs_spectrum_eV.png", dpi=figure_dpi)
 
     # export data
     if export_spectrum:
