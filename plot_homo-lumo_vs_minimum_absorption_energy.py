@@ -5,13 +5,43 @@ import matplotlib.pyplot as plt  # plots
 
 from utils import nsplit, flatten
 
-import shutil
-
 from mpi4py import MPI
+
+import numpy as np
+
+from scipy.interpolate import griddata
 
 comm = MPI.COMM_WORLD
 comm_size = comm.Get_size()
 comm_rank = comm.Get_rank()
+
+
+def getcolordensity(xdata, ydata, normalize=False):
+    ###############################
+    nbin = 20
+    hist2d, xbins_edge, ybins_edge = np.histogram2d(
+        x=xdata, y=ydata, density=False, bins=[nbin, nbin]
+    )
+    xbin_cen = 0.5 * (xbins_edge[0:-1] + xbins_edge[1:])
+    ybin_cen = 0.5 * (ybins_edge[0:-1] + ybins_edge[1:])
+    BCTY, BCTX = np.meshgrid(ybin_cen, xbin_cen)
+    if normalize:
+        hist2d = hist2d / np.amax(hist2d)
+    print(np.amax(hist2d))
+
+    bctx1d = np.reshape(BCTX, len(xbin_cen) * nbin)
+    bcty1d = np.reshape(BCTY, len(xbin_cen) * nbin)
+    loc_pts = np.zeros((len(xbin_cen) * nbin, 2))
+    loc_pts[:, 0] = bctx1d
+    loc_pts[:, 1] = bcty1d
+    hist2d_norm = griddata(
+        loc_pts,
+        hist2d.reshape(len(xbin_cen) * nbin),
+        (xdata, ydata),
+        method="linear",
+        fill_value=0,
+    )  # np.nan)
+    return hist2d_norm
 
 
 def generate_plot(path):
@@ -92,9 +122,12 @@ def generate_plot(path):
         min_value = min( min(flattened_homo_lumo_gap_list_all), min(flattened_minimum_absorption_energy_list_all) )
         max_value = max( max(flattened_homo_lumo_gap_list_all), max(flattened_minimum_absorption_energy_list_all) )
 
+        hist2d_norm = getcolordensity(flattened_homo_lumo_gap_list_all, flattened_minimum_absorption_energy_list_all)
+
         plt.figure()
-        plt.scatter(flattened_homo_lumo_gap_list_all, flattened_minimum_absorption_energy_list_all)
-        plt.ylabel('Minimum absorption energy (eV)')
+        sc = plt.scatter(flattened_homo_lumo_gap_list_all, flattened_minimum_absorption_energy_list_all, c=hist2d_norm)
+        plt.colorbar(sc)
+        plt.ylabel('Minimum Absorption Energy (eV)')
         plt.xlabel('HOMO-LUMO gap (eV)')
         plt.title('HOMO-LUMO gap vs. Minimum Absorption Energy')
         plt.xlim((min_value-1, max_value+1))
