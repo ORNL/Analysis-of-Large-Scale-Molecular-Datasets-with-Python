@@ -247,6 +247,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
     if nm_plot:
         # convert wave number to nm for nm plot
         valuelist = [convert_ev_in_nm(value) for value in energylist]
+        valuelist.sort()
         w = w_nm  # use line width for nm axis
     else:
         valuelist = energylist
