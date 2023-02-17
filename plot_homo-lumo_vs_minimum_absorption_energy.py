@@ -125,11 +125,21 @@ def generate_plot(path):
         hist2d_norm = getcolordensity(flattened_homo_lumo_gap_list_all, flattened_minimum_absorption_energy_list_all)
 
         plt.figure()
-        sc = plt.scatter(flattened_homo_lumo_gap_list_all, flattened_minimum_absorption_energy_list_all, c=hist2d_norm)
+
+        # getting the original colormap using cm.get_cmap() function
+        #orig_map=plt.cm.get_cmap('plasma')
+        orig_map=plt.cm.get_cmap('viridis')
+
+        # reversing the original colormap using reversed() function
+        reversed_map = orig_map.reversed()
+        sc = plt.scatter(flattened_homo_lumo_gap_list_all, flattened_minimum_absorption_energy_list_all, c=hist2d_norm, cmap=reversed_map)
         plt.colorbar(sc)
         plt.ylabel('Minimum Absorption Energy (eV)')
         plt.xlabel('HOMO-LUMO gap (eV)')
-        plt.title('HOMO-LUMO gap vs. Minimum Absorption Energy')
+        if 'gdb9' in path:
+            plt.title('GDB-9-Ex')
+        else if 'aisd' in path:
+            plt.title('ORNL_AISD-Ex')
         plt.xlim((min_value-1, max_value+1))
         plt.ylim((min_value-1, max_value+1))
         ax = plt.gca()
