@@ -131,9 +131,12 @@ def select_molecules(source_path, destination_path, nm_range, min_mol_size):
 
                 energylist = [1 / wn * 10 ** 7 for wn in energylist]
 
-                # check if maximum absorption wavelength is between desired range
-                if nm_range[0] <= energylist[0] <= nm_range[1]:
-                    shutil.copytree(source_path + '/' + dir, destination_path + '/' + dir)
+                try:
+                    # check if maximum absorption wavelength is between desired range
+                    if nm_range[0] <= energylist[0] <= nm_range[1]:
+                        shutil.copytree(source_path + '/' + dir, destination_path + '/' + dir)
+                except:
+                    print("Error Reading maximum absorption wavelength for Molecule " + dir, flush=True)
 
             # file not found -> exit here
             except IOError:
