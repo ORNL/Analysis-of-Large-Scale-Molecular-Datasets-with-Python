@@ -26,11 +26,16 @@ from utils import nsplit, gauss
 
 plt.rcParams.update({'font.size': 22})
 
-specstring_start = 'ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS'  # check orca.out from here
-specstring_end = 'ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS'  # stop reading orca.out from here
-
 # global constants
 found_uv_section = False  # check for uv data in out
+specstring_start = 'ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS'  # check orca.out from here
+
+ORCA_METHOD = "EOM-CCSD"
+
+if ORCA_METHOD == "TD-DFT":
+    specstring_end = 'ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS'  # stop reading orca.out from here
+elif ORCA_METHOD == "EOM-CCSD":
+    specstring_end = "CD SPECTRUM" # stop reading orca.out from here
 
 # global lists
 statelist = list()  # mode

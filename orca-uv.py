@@ -22,7 +22,14 @@ plt.rcParams.update({"font.size": 22})
 # global constants
 found_uv_section = False  # check for uv data in out
 specstring_start = 'ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS'  # check orca.out from here
-specstring_end = 'ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS'  # stop reading orca.out from here
+
+ORCA_METHOD = "EOM-CCSD"
+
+if ORCA_METHOD == "TD-DFT":
+    specstring_end = 'ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS'  # stop reading orca.out from here
+elif ORCA_METHOD == "EOM-CCSD":
+    specstring_end = "CD SPECTRUM" # stop reading orca.out from here
+
 w_wn = 1000  # w = line width for broadening - wave numbers, FWHM
 w_nm = 10  # w = line width for broadening - nm, FWHM
 export_delim = " "  # delimiter for data export
@@ -184,6 +191,7 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
                         # split line into 3 lists mode, energy, intensities
                         # line should start with a number
                         if re.search("\d\s{1,}\d", line):
+                            print(line)
                             statelist.append(int(line.strip().split()[0]))
                             energylist.append(float(line.strip().split()[1]))
                             intenslist.append(float(line.strip().split()[3]))
@@ -458,7 +466,7 @@ def draw_2Dmol(path):
 
 
 if __name__ == "__main__":
-    path = "/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/small_GDB-9-Ex-ORCA-TD-DFT-PBE0"
+    path = "/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/GDB-9-Ex-ORCA-EOM-CCSD"
     min_energy = 0.0
     max_energy = 100.0
     min_wavelength = 0.0
