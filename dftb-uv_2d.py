@@ -318,7 +318,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
 
     ax.set_ylabel(y_label)  # label y axis
     ax.set_title("Absorption spectrum " + smiles_string, fontweight=spectrum_title_weight)  # title
-    ax.get_yaxis().set_ticks([])  # remove ticks from y axis
+    #ax.get_yaxis().set_ticks([])  # remove ticks from y axis
     plt.tight_layout()  # tight layout
 
     # show minor ticks
