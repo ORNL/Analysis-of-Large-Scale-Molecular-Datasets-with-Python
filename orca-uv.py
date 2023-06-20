@@ -49,6 +49,7 @@ spectrum_title_weight = "bold"  # weight of the title font: 'normal' | 'bold' | 
 y_label = "intensity"  # label of y-axis
 x_label_wn = r'energy /cm$^{-1}$'  # label of the x-axis - wave number
 x_label_nm = r'$\lambda$ /nm'  # label of the x-axis - nm
+plt_y_lim = 0.4
 figure_dpi = 300  # DPI of the picture
 
 # global lists
@@ -191,7 +192,6 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
                         # split line into 3 lists mode, energy, intensities
                         # line should start with a number
                         if re.search("\d\s{1,}\d", line):
-                            print(line)
                             statelist.append(int(line.strip().split()[0]))
                             energylist.append(float(line.strip().split()[1]))
                             intenslist.append(float(line.strip().split()[3]))
@@ -301,7 +301,7 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
     ax.set_ylabel(y_label)  # label y axis
 
     ax.set_title(
-        "Absorption spectrum " + dir, fontweight=spectrum_title_weight
+        ORCA_METHOD + ' ' + dir, fontweight=spectrum_title_weight
     )  # title
 
     #ax.get_yaxis().set_ticks([])  # remove ticks from y axis
@@ -341,6 +341,7 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
 
         if nm_plot:
             # plt.xlim(60,500)
+            plt.ylim(0.0, plt_y_lim)
             plt.savefig(f"{filename}/abs_spectrum_nm.png", dpi=figure_dpi)
         else:
             # plt.xlim(2.50,15)

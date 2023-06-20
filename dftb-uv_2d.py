@@ -63,6 +63,7 @@ spectrum_title_weight = "bold"  # weight of the title font: 'normal' | 'bold' | 
 y_label = "intensity"  # label of y-axis
 x_label_eV = r'energy (eV)'  # label of the x-axis - eV
 x_label_nm = r'wavelength (nm)'  # label of the x-axis - nm
+plt_y_lim = 0.4
 figure_dpi = 100  # DPI of the picture
 
 
@@ -188,7 +189,7 @@ def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
     return min_energy, max_energy, convert_ev_in_nm(max_energy), convert_ev_in_nm(min_energy)
 
 
-def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength):
+def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavelength):
     if nm_plot:
         spectrum_discretization_step = 0.02
         xmin_spectrum = min(0.0, min_wavelength)
@@ -206,7 +207,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
     intenslist = list()  # fosc
     gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum
 
-    spectrum_file = path + '/' + 'EXC.DAT'
+    spectrum_file = path + '/' + dir + '/' + 'EXC.DAT'
 
     # open a file
     # check existence
@@ -231,7 +232,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
         sys.exit(1)
 
     try:
-        smile_string_file = path + '/' + 'smiles.pdb'
+        smile_string_file = path + '/' + dir + '/' + 'smiles.pdb'
         mol = MolFromPDBFile(smile_string_file, sanitize=False, proximityBonding=True)
         mol = RemoveAllHs(mol)
         with open(smile_string_file, "r") as input_file:
@@ -281,10 +282,11 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
 
     # plot spectra
     if show_conv_spectrum:
-        filename, file_extension = os.path.splitext(path)
+        filename, file_extension = os.path.splitext(path+'/'+dir)
         mol2d_im = image.imread(f"{filename}/mol_2d_drawing.png")
         imagebox = OffsetImage(mol2d_im,zoom=0.5)
-        ab = AnnotationBbox(imagebox, (max(plt_range_x)*0.8,max(plt_range_gauss_sum_y)*0.6), frameon = True)
+        #ab = AnnotationBbox(imagebox, (max(plt_range_x)*0.8,max(plt_range_gauss_sum_y)*0.6), frameon = True)
+        ab = AnnotationBbox(imagebox, (max(plt_range_x) * 0.8, plt_y_lim * 0.6), frameon=True)
         ax.add_artist(ab)
         ax.plot(plt_range_x, plt_range_gauss_sum_y, color="black", linewidth=0.8)
 
@@ -317,7 +319,7 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
         ax.set_xlabel(x_label_eV)
 
     ax.set_ylabel(y_label)  # label y axis
-    ax.set_title("Absorption spectrum " + smiles_string, fontweight=spectrum_title_weight)  # title
+    ax.set_title("TD-DFTB " + dir, fontweight=spectrum_title_weight)  # title
     #ax.get_yaxis().set_ticks([])  # remove ticks from y axis
     plt.tight_layout()  # tight layout
 
@@ -344,10 +346,10 @@ def smooth_spectrum(path, min_energy, max_energy, min_wavelength, max_wavelength
 
     # save the plot
     if save_spectrum:
-        filename, file_extension = os.path.splitext(path)
+        filename, file_extension = os.path.splitext(path + '/' + dir)
 
         if nm_plot:
-            #plt.xlim(60,500)
+            plt.ylim(0.0,plt_y_lim)
             plt.savefig(f"{filename}/abs_spectrum_nm.png", dpi=figure_dpi)
         else:
             #plt.xlim(2.50,15)
@@ -398,7 +400,7 @@ def smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
         print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + '/' + dir + '/' + 'EXC.DAT'):
-            smooth_spectrum(path + '/' + dir, min_energy, max_energy, min_wavelength, max_wavelength)
+            smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavelength)
 
 
 def draw_2Dmols(path):
