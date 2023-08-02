@@ -22,19 +22,12 @@ import shutil
 from rdkit.Chem.rdchem import HybridizationType
 from rdkit.Chem.rdmolfiles import MolFromPDBFile
 
-from utils import nsplit, gauss
+from utils import nsplit, convert_ev_in_nm, generate_graphdata
 
 plt.rcParams.update({'font.size': 22})
 
-planck_constant = 4.1357 * 1e-15  # eV s
-light_speed = 299792458  # m / s
-meter_to_nanometer_conversion = 1e+9
-
 # global constants
 found_uv_section = False  # check for uv data in out
-
-def convert_ev_in_nm(ev_value):
-    return 1 / ev_value * planck_constant * light_speed * meter_to_nanometer_conversion
 
 
 from mpi4py import MPI
@@ -42,37 +35,6 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 comm_size = comm.Get_size()
 comm_rank = comm.Get_rank()
-
-
-def generate_graphdata(pdb_file_name):
-    mol = MolFromPDBFile(pdb_file_name, sanitize=False, proximityBonding=True,
-                         removeHs=True)  # , sanitize=False , removeHs=False)
-    # mol = Chem.AddHs(mol)
-    # N = mol.GetNumAtoms()
-
-    assert mol is not None, "MolFromPDBFile returned None for {}".format(pdb_file_name)
-
-    type_idx = []
-    atomic_number = []
-    aromatic = []
-    sp = []
-    sp2 = []
-    sp3 = []
-    N = 0
-    for atom in mol.GetAtoms():
-        # Since "sanitize" is set to False, the removal of H atoms must be done manually
-        if atom.GetSymbol() != "H":
-            N = N + 1
-            atomic_number.append(atom.GetAtomicNum())
-            aromatic.append(1 if atom.GetIsAromatic() else 0)
-            hybridization = atom.GetHybridization()
-            sp.append(1 if hybridization == HybridizationType.SP else 0)
-            sp2.append(1 if hybridization == HybridizationType.SP2 else 0)
-            sp3.append(1 if hybridization == HybridizationType.SP3 else 0)
-
-    chemical_composition = {x: atomic_number.count(x) for x in atomic_number}
-
-    return N, chemical_composition
 
 
 def select_molecules(source_path, destination_path, nm_range, min_mol_size):

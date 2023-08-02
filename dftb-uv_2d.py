@@ -26,10 +26,8 @@ from scipy.signal import find_peaks  # peak detection
 
 from rdkit.Chem.rdmolops import RemoveAllHs
 from rdkit.Chem.rdmolfiles import MolFromPDBFile, MolToSmiles
-from rdkit.Chem.Draw import rdMolDraw2D
-from rdkit.Chem import AllChem
 
-from utils import nsplit, gauss
+from utils import nsplit, gauss, convert_ev_in_nm, draw_2Dmols
 
 plt.rcParams.update({'font.size': 22})
 
@@ -65,16 +63,6 @@ x_label_eV = r'energy (eV)'  # label of the x-axis - eV
 x_label_nm = r'wavelength (nm)'  # label of the x-axis - nm
 plt_y_lim = 0.4
 figure_dpi = 100  # DPI of the picture
-
-
-def convert_ev_in_nm(ev_value):
-    return 1 / ev_value * planck_constant * light_speed * meter_to_nanometer_conversion
-
-
-
-comm = MPI.COMM_WORLD
-comm_size = comm.Get_size()
-comm_rank = comm.Get_rank()
 
 # parse arguments
 parser = argparse.ArgumentParser(prog='orca_uv', description='Easily plot absorption spectra from orca.out')
@@ -139,10 +127,10 @@ min_energy = float('inf')
 max_energy = float('-inf')
 
 
-# nm_plot = args.plotwn
-
-def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
+def find_energy_and_wavelength_extremes(comm, path, min_energy, max_energy):
     comm.Barrier()
+    comm_size = comm.Get_size()
+    comm_rank = comm.Get_rank()
     if comm_rank == 0:
         print("=" * 50, flush=True)
         print("Computing minimum and maximum of the spectrum range", flush=True)
@@ -189,7 +177,8 @@ def find_energy_and_wavelength_extremes(path, min_energy, max_energy):
     return min_energy, max_energy, convert_ev_in_nm(max_energy), convert_ev_in_nm(min_energy)
 
 
-def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavelength):
+def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max_wavelength):
+    comm_rank = comm.Get_rank()
     if nm_plot:
         spectrum_discretization_step = 0.02
         xmin_spectrum = min(0.0, min_wavelength)
@@ -229,7 +218,6 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
     # file not found -> exit here
     except IOError:
         print(f"'{spectrum_file}'" + " not found", flush=True)
-        sys.exit(1)
 
     try:
         smile_string_file = path + '/' + dir + '/' + 'smiles.pdb'
@@ -239,11 +227,8 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
             smiles_string = MolToSmiles(mol)
     except IOError:
         print(f"'{smile_string_file}'" + " not found", flush=True)
-        sys.exit(1)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ")
-        smiles_string = smile_string_file
-        # comm.Abort(1)
+        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
 
     if nm_plot:
         # convert wave number to nm for nm plot
@@ -380,8 +365,10 @@ def smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavel
     plt.close(fig)
 
 
-def smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength):
+def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavelength):
     comm.Barrier()
+    comm_size = comm.Get_size()
+    comm_rank = comm.Get_rank()
     if comm_rank == 0:
         print("=" * 50, flush=True)
         print("Smooth spectra", flush=True)
@@ -403,64 +390,23 @@ def smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
             smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavelength)
 
 
-def draw_2Dmols(path):
-    comm.Barrier()
-    if comm_rank == 0:
-        print("=" * 50, flush=True)
-        print("Draw molecules", flush=True)
-        print("=" * 50, flush=True)
-    comm.Barrier()
-    dirs = None
-    if comm_rank == 0:
-        dirs = [f.name for f in os.scandir(path) if f.is_dir()]
-
-    dirs = comm.bcast(dirs, root=0)
-    rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
-    total = rx.stop - rx.start
-    count = 0
-    for dir in sorted(dirs)[rx.start:rx.stop]:
-        count = count + 1
-        print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
-        # collect information about molecular structure and chemical composition
-        if os.path.exists(path + '/' + dir + '/' + 'smiles.pdb'):
-            draw_2Dmol(path + '/' + dir)
-
-
-def draw_2Dmol(path):
-    try:
-        smile_string_file = path + '/' + 'smiles.pdb'
-        mol = MolFromPDBFile(smile_string_file, sanitize=False, proximityBonding=True)
-        with open(smile_string_file, "r") as input_file:
-            smiles_string = MolToSmiles(mol)
-        mol = RemoveAllHs(mol)
-        AllChem.Compute2DCoords(mol)
-        if save_moldraw:
-            filename, file_extension = os.path.splitext(path)
-            d = rdMolDraw2D.MolDraw2DCairo(250, 250)
-            rdMolDraw2D.PrepareAndDrawMolecule(d, mol)
-            d.WriteDrawingText(f"{filename}/mol_2d_drawing.png")
-
-    except IOError:
-        print(f"'{smile_string_file}'" + " not found", flush=True)
-        sys.exit(1)
-    except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ")
-        smiles_string = smile_string_file
-        # comm.Abort(1)
-
-
 if __name__ == '__main__':
     path = './dftb_gdb9_electronic_excitation_spectrum'
     min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy,
                                                                                                  max_energy)
-    min_energy = comm.allreduce(min_energy, op=MPI.MIN)
-    max_energy = comm.allreduce(max_energy, op=MPI.MAX)
-    min_wavelength = comm.allreduce(min_wavelength, op=MPI.MIN)
-    max_wavelength = comm.allreduce(max_wavelength, op=MPI.MAX)
-    draw_2Dmols(path)
-    smooth_spectra(path, min_energy, max_energy, min_wavelength, max_wavelength)
+
+    communicator = MPI.COMM_WORLD
+
+    min_energy = communicator.allreduce(min_energy, op=MPI.MIN)
+    max_energy = communicator.allreduce(max_energy, op=MPI.MAX)
+    min_wavelength = communicator.allreduce(min_wavelength, op=MPI.MIN)
+    max_wavelength = communicator.allreduce(max_wavelength, op=MPI.MAX)
+    draw_2Dmols(communicator, path, save_moldraw)
+    smooth_spectra(communicator, path, min_energy, max_energy, min_wavelength, max_wavelength)
+    comm_size = communicator.Get_size()
+    comm_rank = communicator.Get_rank()
 
     print("Rank ", comm_rank, " done.", flush=True)
-    comm.Barrier()
+    communicator.Barrier()
     if comm_rank == 0:
         print("Done. Exiting", flush=True)
