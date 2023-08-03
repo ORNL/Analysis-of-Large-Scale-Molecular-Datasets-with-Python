@@ -42,7 +42,10 @@ comm_rank = comm.Get_rank()
 
 
 
-def select_molecules(source_path, destination_path, nm_range, min_mol_size):
+def select_molecules(comm, source_path, destination_path, nm_range, min_mol_size=None):
+    comm_size = comm.Get_size()
+    comm_rank = comm.Get_rank()
+
     comm.Barrier()
     if comm_rank == 0:
         print("=" * 50, flush=True)
@@ -65,17 +68,22 @@ def select_molecules(source_path, destination_path, nm_range, min_mol_size):
         # collect information about molecular structure and chemical composition
 
         check_criteria_and_copy_orca_dir(source_path, destination_path, dir, specstring_start, specstring_end,
-                                         nm_range)
+                                         nm_range, min_mol_size)
 
     return
 
 
 if __name__ == '__main__':
+
+    communicator = MPI.COMM_WORLD
+    comm_size = communicator.Get_size()
+    comm_rank = communicator.Get_rank()
+
     source_path = "./GDB-9-Ex-ORCA-TD-DFT-PBE0"
     destination_path = './GDB-9-Ex-ORCA-TD-DFT-PBE0_subset_selected'
     nm_range = [380, 750]
     min_molecule_size = None
-    select_molecules(source_path, destination_path, nm_range, min_molecule_size)
+    select_molecules(communicator, source_path, destination_path, nm_range, min_molecule_size)
 
     print("Rank ", comm_rank, " done.", flush=True)
     comm.Barrier()

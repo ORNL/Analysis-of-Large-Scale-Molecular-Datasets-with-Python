@@ -22,22 +22,20 @@ import shutil
 from rdkit.Chem.rdchem import HybridizationType
 from rdkit.Chem.rdmolfiles import MolFromPDBFile
 
-from utils import nsplit, convert_ev_in_nm, generate_graphdata
+from utils import nsplit, check_criteria_and_copy_dftb_dir
 
 plt.rcParams.update({'font.size': 22})
 
 # global constants
 found_uv_section = False  # check for uv data in out
 
-
 from mpi4py import MPI
 
-comm = MPI.COMM_WORLD
-comm_size = comm.Get_size()
-comm_rank = comm.Get_rank()
 
+def select_molecules(comm, source_path, destination_path, nm_range, min_mol_size=None):
+    comm_size = comm.Get_size()
+    comm_rank = comm.Get_rank()
 
-def select_molecules(source_path, destination_path, nm_range, min_mol_size):
     comm.Barrier()
     if comm_rank == 0:
         print("=" * 50, flush=True)
@@ -58,66 +56,25 @@ def select_molecules(source_path, destination_path, nm_range, min_mol_size):
     for dir in sorted(dirs)[rx.start:rx.stop]:
         print("f Rank: ", comm_rank, " - dir: ", dir, flush=True)
         # collect information about molecular structure and chemical composition
-        spectrum_file = source_path + '/' + dir + '/' + 'EXC.DAT'
-        smiles_file = source_path + '/' + dir + '/' + '/smiles.pdb'
-        homo_lumo_file = source_path + '/' + dir + '/' + '/band.out'
-        if os.path.exists(spectrum_file):
-            energylist = list()  # energy eV
-            # open a file
-            # check existence
-            try:
-                with open(spectrum_file, "r") as input_file:
-                    count_line = 0
-                    for line in input_file:
-                        # only recognize lines that start with number
-                        # split line into 3 lists mode, energy, intensities
-                        # line should start with a number
-                        if 5 <= count_line <= 55:
-                            if re.search("\d\s{1,}\d", line):
-                                energylist.append(float(line.strip().split()[0]))
-                        else:
-                            pass
-                        count_line = count_line + 1
 
-                    try:
-                        with open(homo_lumo_file, 'r') as bandfile:
-                            HOMO = LUMO = None
-                            for line in bandfile:
-                                if "2.00000" in line:
-                                    HOMO = float(line[9:17])
-                                if LUMO is None and "0.00000" in line:
-                                    LUMO = float(line[9:17])
-
-                            if (HOMO is not None) and (LUMO is not None):
-                                homo_lumo_gap_nm = convert_ev_in_nm(LUMO - HOMO)
-
-                    except:
-                        print("Error Reading HOMO-LUMO for Molecule " + dir, flush=True)
-
-                    if 400 <= homo_lumo_gap_nm <= 600:
-                        if min_mol_size is not None:
-                            num_atoms, chemical_composition = generate_graphdata(smiles_file)
-                            if num_atoms <= min_mol_size:
-                                break
-
-                        shutil.copytree(source_path + '/' + dir, destination_path + '/' + dir)
-
-            # file not found -> exit here
-            except IOError:
-                print(f"'{spectrum_file}'" + " not found", flush=True)
-                sys.exit(1)
+        check_criteria_and_copy_dftb_dir(source_path, destination_path, dir, nm_range, min_mol_size)
 
     return
 
 
 if __name__ == '__main__':
+
+    communicator = MPI.COMM_WORLD
+    comm_size = communicator.Get_size()
+    comm_rank = communicator.Get_rank()
+
     source_path = './dftb_gdb9_electronic_excitation_spectrum'
     destination_path = './dftb_gdb9_subset_selected'
     nm_range = [400, 600]
     min_molecule_size = None
-    select_molecules(source_path, destination_path, nm_range, min_molecule_size)
+    select_molecules(communicator, source_path, destination_path, nm_range, min_molecule_size)
 
     print("Rank ", comm_rank, " done.", flush=True)
-    comm.Barrier()
+    communicator.Barrier()
     if comm_rank == 0:
         print("Done. Exiting", flush=True)

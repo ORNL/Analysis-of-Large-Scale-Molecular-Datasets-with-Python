@@ -15,7 +15,7 @@ import math
 import matplotlib.pyplot as plt  # plots
 from scipy.signal import find_peaks  # peak detection
 
-from utils import nsplit, gauss, read_orca_file, draw_2Dmols
+from utils import nsplit, gauss, read_orca_output, draw_2Dmols
 
 plt.rcParams.update({"font.size": 22})
 
@@ -173,11 +173,13 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     # open a file
     # check existence
     try:
-        statelist, energylist, intenlist = read_orca_file(spectrum_file, specstring_start, specstring_end)
+        statelist, energylist, intenlist = read_orca_output(spectrum_file, specstring_start, specstring_end)
 
     # file not found -> exit here
     except IOError:
         print(f"'{spectrum_file}'" + " not found", flush=True)
+    except Exception as e:
+        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
 
     if nm_plot:
         # convert wave number to nm for nm plot

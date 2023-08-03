@@ -27,13 +27,9 @@ from scipy.signal import find_peaks  # peak detection
 from rdkit.Chem.rdmolops import RemoveAllHs
 from rdkit.Chem.rdmolfiles import MolFromPDBFile, MolToSmiles
 
-from utils import nsplit, gauss, convert_ev_in_nm, draw_2Dmols
+from utils import nsplit, gauss, convert_ev_in_nm, read_dftb_output, draw_2Dmols
 
 plt.rcParams.update({'font.size': 22})
-
-planck_constant = 4.1357 * 1e-15  # eV s
-light_speed = 299792458  # m / s
-meter_to_nanometer_conversion = 1e+9
 
 # global constants
 found_uv_section = True  # check for uv data in out
@@ -42,6 +38,9 @@ specstring_end = ''  # stop reading orca.out from here
 w_eV = 0.5  # w = line width for broadening - eV, FWHM
 w_nm = 10.0  # w = line width for broadening - nm, FWHM
 export_delim = " "  # delimiter for data export
+
+read_dftb_outoput_start_line = 5
+read_dftb_outoput_end_line = 55
 
 # parameters to discretize the spectrum
 #spectrum_discretization_step = 0.2
@@ -149,22 +148,10 @@ def find_energy_and_wavelength_extremes(comm, path, min_energy, max_energy):
         # collect information about molecular structure and chemical composition
         spectrum_file = path + '/' + dir + '/' + '/' + 'EXC.DAT'
         if os.path.exists(spectrum_file):
-            energylist = list()  # energy eV
             # open a file
             # check existence
             try:
-                with open(spectrum_file, "r") as input_file:
-                    count_line = 0
-                    for line in input_file:
-                        # only recognize lines that start with number
-                        # split line into 3 lists mode, energy, intensities
-                        # line should start with a number
-                        if 5 <= count_line <= 55:
-                            if re.search("\d\s{1,}\d", line):
-                                energylist.append(float(line.strip().split()[0]))
-                        else:
-                            pass
-                        count_line = count_line + 1
+                energylist, intenslist = read_dftb_output(spectrum_file, read_dftb_outoput_start_line, read_dftb_outoput_end_line)
 
                 min_energy = min(min_energy, energylist[0])
                 max_energy = max(max_energy, energylist[-1])
@@ -172,7 +159,8 @@ def find_energy_and_wavelength_extremes(comm, path, min_energy, max_energy):
             # file not found -> exit here
             except IOError:
                 print(f"'{spectrum_file}'" + " not found", flush=True)
-                sys.exit(1)
+            except Exception as e:
+                print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
 
     return min_energy, max_energy, convert_ev_in_nm(max_energy), convert_ev_in_nm(min_energy)
 
@@ -190,10 +178,6 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
         xmin_spectrum = min(0.0, min_energy)
         xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
 
-    # global lists
-    statelist = list()  # mode
-    energylist = list()  # energy eV
-    intenslist = list()  # fosc
     gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum
 
     spectrum_file = path + '/' + dir + '/' + 'EXC.DAT'
@@ -201,23 +185,13 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     # open a file
     # check existence
     try:
-        with open(spectrum_file, "r") as input_file:
-            count_line = 0
-            for line in input_file:
-                # only recognize lines that start with number
-                # split line into 3 lists mode, energy, intensities
-                # line should start with a number
-                if 5 <= count_line <= 55:
-                    if re.search("\d\s{1,}\d", line):
-                        energylist.append(float(line.strip().split()[0]))
-                        intenslist.append(float(line.strip().split()[1]))
-                else:
-                    pass
-                count_line = count_line + 1
+        energylist, intenslist = read_dftb_output(spectrum_file, read_dftb_outoput_start_line, read_dftb_outoput_end_line)
 
     # file not found -> exit here
     except IOError:
         print(f"'{spectrum_file}'" + " not found", flush=True)
+    except Exception as e:
+        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
 
     try:
         smile_string_file = path + '/' + dir + '/' + 'smiles.pdb'

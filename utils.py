@@ -9,8 +9,10 @@ from rdkit.Chem.rdmolfiles import MolFromPDBFile, MolToSmiles
 from rdkit.Chem.rdchem import HybridizationType
 from rdkit.Chem.Draw import rdMolDraw2D
 
+
 def flatten(l):
     return [item for sublist in l for item in sublist]
+
 
 def nsplit(a, n):
     k, m = divmod(len(a), n)
@@ -25,6 +27,7 @@ def gauss(a, m, x, w):
     # w = line width, FWHM
     return a * np.exp(-(np.log(2) * ((m - x) / w) ** 2))
 
+
 def convert_ev_in_nm(ev_value):
     planck_constant = 4.1357 * 1e-15  # eV s
     light_speed = 299792458  # m / s
@@ -32,32 +35,92 @@ def convert_ev_in_nm(ev_value):
     return 1 / ev_value * planck_constant * light_speed * meter_to_nanometer_conversion
 
 
-def check_criteria_and_copy_orca_dir(source_path, destination_path, dir, specstring_start, specstring_end, nm_range):
+def check_criteria_and_copy_dftb_dir(source_path, destination_path, dir, nm_range, min_mol_size=None):
+    spectrum_file = source_path + '/' + dir + '/' + 'EXC.DAT'
+    smiles_file = source_path + '/' + dir + '/' + '/smiles.pdb'
+    homo_lumo_file = source_path + '/' + dir + '/' + '/band.out'
 
+    if os.path.exists(spectrum_file):
+
+        # open a file
+        # check existence
+        try:
+            with open(homo_lumo_file, 'r') as bandfile:
+                HOMO = LUMO = None
+                for line in bandfile:
+                    if "2.00000" in line:
+                        HOMO = float(line[9:17])
+                    if LUMO is None and "0.00000" in line:
+                        LUMO = float(line[9:17])
+
+                if (HOMO is not None) and (LUMO is not None):
+                    homo_lumo_gap_nm = convert_ev_in_nm(LUMO - HOMO)
+
+        except:
+            print("Error Reading HOMO-LUMO for Molecule " + dir, flush=True)
+
+        if nm_range[0] <= homo_lumo_gap_nm <= nm_range[1]:
+            if min_mol_size is not None:
+                num_atoms, chemical_composition = generate_graphdata(smiles_file)
+                if num_atoms <= min_mol_size:
+                    return
+            shutil.copytree(source_path + '/' + dir, destination_path + '/' + dir)
+
+    else:
+        print(f"Error reading {spectrum_file}", flush=True)
+
+
+def check_criteria_and_copy_orca_dir(source_path, destination_path, dir, specstring_start, specstring_end, nm_range,
+                                     min_mol_size=None):
     spectrum_file = source_path + '/' + dir + '/' + 'orca.stdout'
+    smiles_file = source_path + '/' + dir + '/' + '/smiles.pdb'
 
     if os.path.exists(spectrum_file):
 
         try:
 
-            statelist, energylist, intenlist = read_orca_file(spectrum_file, specstring_start, specstring_end)
+            statelist, energylist, intenlist = read_orca_output(spectrum_file, specstring_start, specstring_end)
 
             energylist = [1 / wn * 10 ** 7 for wn in energylist]
 
             try:
                 # check if maximum absorption wavelength is between desired range
                 if nm_range[0] <= energylist[0] <= nm_range[1]:
+                    if min_mol_size is not None:
+                        num_atoms, chemical_composition = generate_graphdata(smiles_file)
+                        if num_atoms <= min_mol_size:
+                            return
                     shutil.copytree(source_path + '/' + dir, destination_path + '/' + dir)
             except:
                 print("Error Reading maximum absorption wavelength for Molecule " + dir, flush=True)
 
-        # file not found -> exit here
-        except IOError:
-            print(f"'{spectrum_file}'" + " not found", flush=True)
+        except:
+            print(f"Error reading {spectrum_file}", flush=True)
 
 
-def read_orca_file(spectrum_file, specstring_start, specstring_end):
+def read_dftb_output(spectrum_file, line_start, line_end):
+    # global lists
+    energylist = list()  # energy cm-1
+    intenslist = list()  # fosc
 
+    with open(spectrum_file, "r") as input_file:
+        count_line = 0
+        for line in input_file:
+            # only recognize lines that start with number
+            # split line into 3 lists mode, energy, intensities
+            # line should start with a number
+            if line_start <= count_line <= line_end:
+                if re.search("\d\s{1,}\d", line):
+                    energylist.append(float(line.strip().split()[0]))
+                    intenslist.append(float(line.strip().split()[1]))
+            else:
+                pass
+            count_line = count_line + 1
+
+    return energylist, intenslist
+
+
+def read_orca_output(spectrum_file, specstring_start, specstring_end):
     # global lists
     statelist = list()  # mode
     energylist = list()  # energy cm-1
@@ -83,6 +146,7 @@ def read_orca_file(spectrum_file, specstring_start, specstring_end):
                         intenslist.append(float(line.strip().split()[3]))
 
     return statelist, energylist, intenslist
+
 
 def generate_graphdata(pdb_file_name):
     mol = MolFromPDBFile(pdb_file_name, sanitize=False, proximityBonding=True,
@@ -161,6 +225,3 @@ def draw_2Dmol(comm, path, save_moldraw):
         print(f"'{smile_string_file}'" + " not found", flush=True)
     except Exception as e:
         print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
-
-
-
