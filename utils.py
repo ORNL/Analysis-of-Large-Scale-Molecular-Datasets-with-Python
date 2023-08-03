@@ -179,7 +179,7 @@ def generate_graphdata(pdb_file_name):
     return N, chemical_composition
 
 
-def draw_2Dmols(comm, path):
+def draw_2Dmols(comm, path, save_moldraw=True):
     comm.Barrier()
     comm_size = comm.Get_size()
     comm_rank = comm.Get_rank()
@@ -201,10 +201,10 @@ def draw_2Dmols(comm, path):
         print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + '/' + dir + '/' + 'smiles.pdb'):
-            draw_2Dmol(path + '/' + dir)
+            draw_2Dmol(comm, path + '/' + dir, save_moldraw)
 
 
-def draw_2Dmol(comm, path, save_moldraw):
+def draw_2Dmol(comm, path, save_moldraw=True):
     comm_size = comm.Get_size()
     comm_rank = comm.Get_rank()
 

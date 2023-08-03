@@ -412,6 +412,6 @@ if __name__ == "__main__":
     comm_rank = communicator.Get_rank()
 
     print("Rank ", comm_rank, " done.", flush=True)
-    comm.Barrier()
+    communicator.Barrier()
     if comm_rank == 0:
         print("Done. Exiting", flush=True)
