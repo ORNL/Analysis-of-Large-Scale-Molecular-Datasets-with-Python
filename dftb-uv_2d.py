@@ -160,7 +160,7 @@ def find_energy_and_wavelength_extremes(comm, path, min_energy, max_energy):
             except IOError:
                 print(f"'{spectrum_file}'" + " not found", flush=True)
             except Exception as e:
-                print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
+                print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
     return min_energy, max_energy, convert_ev_in_nm(max_energy), convert_ev_in_nm(min_energy)
 
@@ -191,7 +191,7 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     except IOError:
         print(f"'{spectrum_file}'" + " not found", flush=True)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
+        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
     try:
         smile_string_file = path + '/' + dir + '/' + 'smiles.pdb'
@@ -202,7 +202,7 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     except IOError:
         print(f"'{smile_string_file}'" + " not found", flush=True)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
+        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
     if nm_plot:
         # convert wave number to nm for nm plot
@@ -330,7 +330,6 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
         # file not found -> exit here
         except IOError:
             print("Write error. Exit.", flush=True)
-            sys.exit(1)
 
     # show the plot
     if show_spectrum:

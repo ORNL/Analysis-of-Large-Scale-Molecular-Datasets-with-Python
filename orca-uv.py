@@ -179,7 +179,7 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     except IOError:
         print(f"'{spectrum_file}'" + " not found", flush=True)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
+        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
     if nm_plot:
         # convert wave number to nm for nm plot
@@ -351,7 +351,7 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
         except IOError:
             print("Write error. Exit.", flush=True)
         except Exception as e:
-            print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
+            print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
     # show the plot
     if show_spectrum:
