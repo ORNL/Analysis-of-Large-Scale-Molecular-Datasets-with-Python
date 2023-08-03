@@ -224,4 +224,4 @@ def draw_2Dmol(comm, path, save_moldraw=True):
     except IOError:
         print(f"'{smile_string_file}'" + " not found", flush=True)
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e.message, e.args)
+        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)

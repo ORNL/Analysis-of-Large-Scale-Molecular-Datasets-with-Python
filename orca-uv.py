@@ -404,8 +404,8 @@ if __name__ == "__main__":
     max_wavelength = 750.0
 
     communicator = MPI.COMM_WORLD
-    draw_2Dmols(communicator, path, save_moldraw)
 
+    draw_2Dmols(communicator, path, save_moldraw)
     smooth_spectra(communicator, path, min_energy, max_energy, min_wavelength, max_wavelength)
 
     comm_size = communicator.Get_size()

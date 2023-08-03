@@ -360,21 +360,22 @@ def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavel
         print("s Rank: ", comm_rank, " - dir: ", dir, ", remaining: ", total - count, flush=True)
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + '/' + dir + '/' + 'EXC.DAT'):
-            smooth_spectrum(path, dir, min_energy, max_energy, min_wavelength, max_wavelength)
+            smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max_wavelength)
 
 
 if __name__ == '__main__':
     path = './dftb_gdb9_electronic_excitation_spectrum'
-    min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(path, min_energy,
-                                                                                                 max_energy)
 
     communicator = MPI.COMM_WORLD
+
+    draw_2Dmols(communicator, path, save_moldraw)
+    min_energy, max_energy, min_wavelength, max_wavelength = find_energy_and_wavelength_extremes(communicator, path, min_energy,
+                                                                                                 max_energy)
 
     min_energy = communicator.allreduce(min_energy, op=MPI.MIN)
     max_energy = communicator.allreduce(max_energy, op=MPI.MAX)
     min_wavelength = communicator.allreduce(min_wavelength, op=MPI.MIN)
     max_wavelength = communicator.allreduce(max_wavelength, op=MPI.MAX)
-    draw_2Dmols(communicator, path, save_moldraw)
     smooth_spectra(communicator, path, min_energy, max_energy, min_wavelength, max_wavelength)
     comm_size = communicator.Get_size()
     comm_rank = communicator.Get_rank()
