@@ -173,7 +173,7 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     # open a file
     # check existence
     try:
-        statelist, energylist, intenlist = read_orca_output(spectrum_file, specstring_start, specstring_end)
+        statelist, energylist, intenslist = read_orca_output(spectrum_file, specstring_start, specstring_end)
 
     # file not found -> exit here
     except IOError:
@@ -392,12 +392,12 @@ def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavel
         # collect information about molecular structure and chemical composition
         if os.path.exists(path + "/" + dir + "/" + "orca.stdout"):
             smooth_spectrum(
-                path, dir, min_energy, max_energy, min_wavelength, max_wavelength
+                comm, path, dir, min_energy, max_energy, min_wavelength, max_wavelength
             )
 
 
 if __name__ == "__main__":
-    path = "/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/GDB-9-Ex-ORCA-EOM-CCSD"
+    path = "/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/GDB-9-Ex-ORCA-EOM-CCSD_subset_selected"
     min_energy = 0.0
     max_energy = 100.0
     min_wavelength = 0.0
