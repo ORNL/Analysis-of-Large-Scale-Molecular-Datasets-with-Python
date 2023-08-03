@@ -189,7 +189,7 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
 
     # file not found -> exit here
     except IOError:
-        print(f"'{spectrum_file}'" + " not found", flush=True)
+        print(f"{dir}/{spectrum_file} not found", flush=True)
     except Exception as e:
         print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
@@ -200,18 +200,24 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
         with open(smile_string_file, "r") as input_file:
             smiles_string = MolToSmiles(mol)
     except IOError:
-        print(f"'{smile_string_file}'" + " not found", flush=True)
+        print(f"{dir}/{smile_string_file}" + " not found", flush=True)
     except Exception as e:
         print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
-    if nm_plot:
-        # convert wave number to nm for nm plot
-        valuelist = [convert_ev_in_nm(value) for value in energylist]
-        valuelist.sort()
-        w = w_nm  # use line width for nm axis
-    else:
-        valuelist = energylist
-        w = w_eV  # use line width for eV axis
+    try:
+        if nm_plot:
+            # convert wave number to nm for nm plot
+            valuelist = [convert_ev_in_nm(value) for value in energylist]
+            valuelist.sort()
+            w = w_nm  # use line width for nm axis
+        else:
+            valuelist = energylist
+            w = w_eV  # use line width for eV axis
+    except IOError:
+        print(f"Cannot extract information from energylist for molecule {dir}")
+    except Exception as e:
+        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
+
 
     # prepare plot
     fig, ax = plt.subplots()

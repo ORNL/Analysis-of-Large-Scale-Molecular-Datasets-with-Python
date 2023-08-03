@@ -43,40 +43,20 @@ show_sticks = True  # show the stick spectra if True
 label_peaks = True  # show peak labels if True
 minor_ticks = True  # show minor ticks if True
 show_grid = False  # show grid if True
-linear_locator = True  # tick locations at the beginning and end of the spectrum x-axis, evenly spaced
-spectrum_title = "Absorption spectrum"  # title
-spectrum_title_weight = "bold"  # weight of the title font: 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight'
-y_label = "intensity"  # label of y-axis
-x_label_wn = r'energy /cm$^{-1}$'  # label of the x-axis - wave number
-x_label_nm = r'$\lambda$ /nm'  # label of the x-axis - nm
-plt_y_lim = 0.4
-figure_dpi = 300  # DPI of the picture
-
-# global lists
-statelist = list()  # mode
-energylist = list()  # energy cm-1
-intenslist = list()  # fosc
-gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum for cm-1
-
-
-# plot config section - configure here
-nm_plot = True  # wavelength plot in nm if True, if False energy plot in eV
-show_single_gauss = True  # show single gauss functions if True
-show_single_gauss_area = True  # show single gauss functions - area plot if True
-show_conv_spectrum = (
-    True  # show the convoluted spectra if True (if False peak labels will not be shown)
-)
-show_sticks = True  # show the stick spectra if True
-label_peaks = False  # show peak labels if True
-minor_ticks = True  # show minor ticks if True
-show_grid = False  # show grid if True
 linear_locator = False  # tick locations at the beginning and end of the spectrum x-axis, evenly spaced
 spectrum_title = "Absorption spectrum"  # title
 spectrum_title_weight = "bold"  # weight of the title font: 'normal' | 'bold' | 'heavy' | 'light' | 'ultrabold' | 'ultralight'
 y_label = "intensity"  # label of y-axis
 x_label_eV = r"energy (eV)"  # label of the x-axis - eV
 x_label_nm = r"wavelength (nm)"  # label of the x-axis - nm
+plt_y_lim = 0.4
 figure_dpi = 100  # DPI of the picture
+
+# global lists
+statelist = list()  # mode
+energylist = list()  # energy cm-1
+intenslist = list()  # fosc
+gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum for cm-1
 
 # parse arguments
 parser = argparse.ArgumentParser(
