@@ -152,10 +152,6 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
         xmin_spectrum = 0.0  # could be min_energy
         xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
 
-    gauss_sum = (
-        list()
-    )  # list for the sum of single gaussian spectra = the convoluted spectrum
-
     spectrum_file = path + '/' + dir + '/' + "orca.stdout"
 
     # open a file
