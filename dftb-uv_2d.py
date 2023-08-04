@@ -12,24 +12,15 @@ The script iterates over a list of directories and in each of them performs the 
 (4) optional: plots the original spectrum and the smoothed spectrum in the file "abs_spectrum.png"
 '''
 
-import sys  # sys files processing
 import os  # os file processing
-import re  # regular expressions
 import argparse  # argument parser
-import numpy as np  # summation
 from mpi4py import MPI
 import math
-import matplotlib.pyplot as plt  # plots
-from matplotlib.offsetbox import (OffsetImage, AnnotationBbox)
-import matplotlib.image as image
-from scipy.signal import find_peaks  # peak detection
 
 from rdkit.Chem.rdmolops import RemoveAllHs
 from rdkit.Chem.rdmolfiles import MolFromPDBFile, MolToSmiles
 
-from utils import nsplit, gauss, convert_ev_in_nm, read_dftb_output, draw_2Dmols
-
-plt.rcParams.update({'font.size': 22})
+from utils import nsplit, convert_ev_in_nm, read_dftb_output, draw_2Dmols, PlotOptions, plot_spectrum
 
 # global constants
 found_uv_section = True  # check for uv data in out
@@ -41,9 +32,6 @@ export_delim = " "  # delimiter for data export
 
 read_dftb_outoput_start_line = 5
 read_dftb_outoput_end_line = 55
-
-# parameters to discretize the spectrum
-#spectrum_discretization_step = 0.2
 
 # plot config section - configure here
 nm_plot = True  # wavelength plot in nm if True, if False energy plot in eV
@@ -122,6 +110,26 @@ save_spectrum = args.nosave
 export_spectrum = args.export
 save_moldraw = args.mdraw
 
+PlotOptions_object = PlotOptions(nm_plot,
+                                 show_single_gauss,
+                                 show_single_gauss_area,
+                                 show_conv_spectrum,
+                                 show_sticks,
+                                 label_peaks,
+                                 x_label_nm,
+                                 x_label_eV,
+                                 y_label,
+                                 plt_y_lim,
+                                 minor_ticks,
+                                 linear_locator,
+                                 spectrum_title_weight,
+                                 show_grid,
+                                 show_spectrum,
+                                 save_spectrum,
+                                 export_spectrum,
+                                 figure_dpi,
+                                 export_delim)
+
 min_energy = float('inf')
 max_energy = float('-inf')
 
@@ -169,16 +177,12 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     comm_rank = comm.Get_rank()
     if nm_plot:
         spectrum_discretization_step = 0.02
-        xmin_spectrum = min(0.0, min_wavelength)
-        xmax_spectrum = math.ceil(max_wavelength) + spectrum_discretization_step
-        #xmin_spectrum = 100
-        xmax_spectrum = 750
+        xmin_spectrum = 0.0 # could be min_wavelength
+        xmax_spectrum = 750 # could be max_wavelength
     else:
         spectrum_discretization_step = 0.01
-        xmin_spectrum = min(0.0, min_energy)
+        xmin_spectrum = 0.0 # could be min_energy
         xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
-
-    gauss_sum = list()  # list for the sum of single gaussian spectra = the convoluted spectrum
 
     spectrum_file = path + '/' + dir + '/' + 'EXC.DAT'
 
@@ -190,8 +194,10 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     # file not found -> exit here
     except IOError:
         print(f"{dir}/{spectrum_file} not found", flush=True)
+        return
     except Exception as e:
         print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
+        return
 
     try:
         smile_string_file = path + '/' + dir + '/' + 'smiles.pdb'
@@ -218,130 +224,8 @@ def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max
     except Exception as e:
         print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
 
+    plot_spectrum(comm, path, dir, spectrum_file, xmin_spectrum, xmax_spectrum, spectrum_discretization_step, valuelist, w, intenslist, PlotOptions_object)
 
-    # prepare plot
-    fig, ax = plt.subplots()
-
-    # plotrange must start at 0 for peak detection
-    plt_range_x = np.arange(xmin_spectrum, xmax_spectrum, spectrum_discretization_step)
-
-    # plot single gauss function for every frequency freq
-    # generate summation of single gauss functions
-    for index, wn in enumerate(valuelist):
-        # single gauss function line plot
-        if nm_plot and not (xmin_spectrum <= valuelist[index] <= xmax_spectrum):
-            break
-        if show_single_gauss:
-            ax.plot(plt_range_x, gauss(intenslist[index], plt_range_x, wn, w), color="grey", alpha=0.5)
-            # single gauss function filled plot
-        if show_single_gauss_area:
-            ax.fill_between(plt_range_x, gauss(intenslist[index], plt_range_x, wn, w), color="grey", alpha=0.5)
-        # sum of gauss functions
-        gauss_sum.append(gauss(intenslist[index], plt_range_x, wn, w))
-
-    # y values of the gauss summation /cm-1
-    plt_range_gauss_sum_y = np.sum(gauss_sum, axis=0)
-
-    # find peaks scipy function, change height for level of detection
-    peaks, _ = find_peaks(plt_range_gauss_sum_y, height=0)
-
-    # plot spectra
-    if show_conv_spectrum:
-        filename, file_extension = os.path.splitext(path+'/'+dir)
-        mol2d_im = image.imread(f"{filename}/mol_2d_drawing.png")
-        imagebox = OffsetImage(mol2d_im,zoom=0.5)
-        #ab = AnnotationBbox(imagebox, (max(plt_range_x)*0.8,max(plt_range_gauss_sum_y)*0.6), frameon = True)
-        ab = AnnotationBbox(imagebox, (max(plt_range_x) * 0.8, plt_y_lim * 0.6), frameon=True)
-        ax.add_artist(ab)
-        ax.plot(plt_range_x, plt_range_gauss_sum_y, color="black", linewidth=0.8)
-
-    # plot sticks
-    if show_sticks:
-        if nm_plot:
-            selected_indices = [index for index, value in enumerate(valuelist) if
-                                (xmin_spectrum <= valuelist[index] <= xmax_spectrum)]
-            ax.stem([valuelist[index] for index in selected_indices], [intenslist[index] for index in selected_indices],
-                    linefmt="dimgrey", markerfmt=" ", basefmt=" ")
-        else:
-            ax.stem(valuelist, intenslist, linefmt="dimgrey", markerfmt=" ", basefmt=" ")
-
-    # optional mark peaks - uncomment in case
-    # ax.plot(peaks,plt_range_gauss_sum_y_wn[peaks],"x")
-
-    # label peaks
-    # show peak labels only if the convoluted spectrum is shown (first if)
-    if show_conv_spectrum:
-        if label_peaks:
-            for index, txt in enumerate(peaks):
-                ax.annotate(peaks[index], xy=(peaks[index], plt_range_gauss_sum_y[peaks[index]]), ha="center",
-                            rotation=90, size=8,
-                            xytext=(0, 5), textcoords='offset points')
-
-    # label x axis
-    if nm_plot:
-        ax.set_xlabel(x_label_nm)
-    else:
-        ax.set_xlabel(x_label_eV)
-
-    ax.set_ylabel(y_label)  # label y axis
-    ax.set_title("TD-DFTB " + dir, fontweight=spectrum_title_weight)  # title
-    #ax.get_yaxis().set_ticks([])  # remove ticks from y axis
-    plt.tight_layout()  # tight layout
-
-    # show minor ticks
-    if minor_ticks:
-        ax.minorticks_on()
-
-    # y-axis range - no dynamic y range
-    # plt.ylim(0,max(plt_range_gauss_sum_y)+max(plt_range_gauss_sum_y)*0.1) # +10% for labels
-
-    # tick locations at the beginning and end of the spectrum x-axis, evenly spaced
-    if linear_locator:
-        ax.xaxis.set_major_locator(plt.LinearLocator())
-
-    # show grid
-    if show_grid:
-        ax.grid(True, which='major', axis='x', color='black', linestyle='dotted', linewidth=0.5)
-
-    # increase figure size N times
-    N = 1.5
-    params = plt.gcf()
-    plSize = params.get_size_inches()
-    params.set_size_inches((plSize[0] * N, plSize[1] * N))
-
-    # save the plot
-    if save_spectrum:
-        filename, file_extension = os.path.splitext(path + '/' + dir)
-
-        if nm_plot:
-            plt.ylim(0.0,plt_y_lim)
-            plt.savefig(f"{filename}/abs_spectrum_nm.png", dpi=figure_dpi)
-        else:
-            #plt.xlim(2.50,15)
-            plt.savefig(f"{filename}/abs_spectrum_eV.png", dpi=figure_dpi)
-
-    # export data
-    if export_spectrum:
-        # get data from plot (window)
-        plotdata = ax.lines[0]
-        xdata = plotdata.get_xdata()
-        ydata = plt_range_gauss_sum_y
-        xlimits = plt.gca().get_xlim()
-        try:
-            spectrum_file_without_extension = os.path.splitext(spectrum_file)[0]
-            with open(spectrum_file_without_extension + "-smooth.DAT", "w") as output_file:
-                for elements in range(len(xdata)):
-                    if xlimits[0] <= xdata[elements] <= xlimits[1]:
-                        output_file.write(str(xdata[elements]) + export_delim + str(ydata[elements]) + '\n')
-        # file not found -> exit here
-        except IOError:
-            print("Write error. Exit.", flush=True)
-
-    # show the plot
-    if show_spectrum:
-        plt.show()
-
-    plt.close(fig)
 
 
 def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavelength):
@@ -370,7 +254,7 @@ def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavel
 
 
 if __name__ == '__main__':
-    path = './dftb_gdb9_electronic_excitation_spectrum'
+    path = '/Users/7ml/Documents/SurrogateProject/ElectronicExcitation/GDB-9-Ex-TDDFTB_subset_selected'
 
     communicator = MPI.COMM_WORLD
 
