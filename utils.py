@@ -235,7 +235,7 @@ def draw_2Dmol(comm, path, save_moldraw=True):
 
 
 class PlotOptions:
-    def __init__(self, nm_plot, show_single_gauss, show_single_gauss_area, show_conv_spectrum, show_sticks, label_peaks, x_label_nm, x_label_eV, y_label, plt_y_lim, minor_ticks, linear_locator, spectrum_title_weight, show_grid, show_spectrum, save_spectrum, export_spectrum, figure_dpi, export_delim):
+    def __init__(self, nm_plot, show_single_gauss, show_single_gauss_area, show_conv_spectrum, show_sticks, label_peaks, x_label_nm, x_label_eV, y_label, plt_y_lim, minor_ticks, linear_locator, spectrum_title_weight, show_grid, show_spectrum, save_spectrum, export_spectrum, figure_dpi, export_delim, calculation_type):
         self.nm_plot = nm_plot
         self.show_single_gauss = show_single_gauss
         self.show_single_gauss_area = show_single_gauss_area
@@ -255,6 +255,7 @@ class PlotOptions:
         self.export_spectrum = export_spectrum
         self.figure_dpi = figure_dpi
         self.export_delim = export_delim
+        self.calculation_type = calculation_type
 
 
 def plot_spectrum(comm, path, dir, spectrum_file, xmin_spectrum, xmax_spectrum, spectrum_discretization_step, valuelist, w, intenslist, PlotOptions_object):
@@ -284,7 +285,7 @@ def plot_spectrum(comm, path, dir, spectrum_file, xmin_spectrum, xmax_spectrum, 
         # sum of gauss functions
         gauss_sum.append(gauss(intenslist[index], plt_range_x, wn, w))
 
-    # y values of the gauss summation /cm-1
+    # y values of the gauss summation
     plt_range_gauss_sum_y = np.sum(gauss_sum, axis=0)
 
     # find peaks scipy function, change height for level of detection
@@ -334,7 +335,7 @@ def plot_spectrum(comm, path, dir, spectrum_file, xmin_spectrum, xmax_spectrum, 
         ax.set_xlabel(PlotOptions_object.x_label_eV)
 
     ax.set_ylabel(PlotOptions_object.y_label)  # label y axis
-    ax.set_title("TD-DFTB " + dir, fontweight=PlotOptions_object.spectrum_title_weight)  # title
+    ax.set_title(f"{PlotOptions_object.calculation_type} " + dir, fontweight=PlotOptions_object.spectrum_title_weight)  # title
     #ax.get_yaxis().set_ticks([])  # remove ticks from y axis
     plt.tight_layout()  # tight layout
 

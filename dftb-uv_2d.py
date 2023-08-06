@@ -128,7 +128,8 @@ PlotOptions_object = PlotOptions(nm_plot,
                                  save_spectrum,
                                  export_spectrum,
                                  figure_dpi,
-                                 export_delim)
+                                 export_delim,
+                                 "TD-DFTB")
 
 min_energy = float('inf')
 max_energy = float('-inf')

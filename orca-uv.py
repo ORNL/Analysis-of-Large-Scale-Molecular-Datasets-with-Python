@@ -134,7 +134,8 @@ PlotOptions_object = PlotOptions(nm_plot,
                                  save_spectrum,
                                  export_spectrum,
                                  figure_dpi,
-                                 export_delim)
+                                 export_delim,
+                                 ORCA_METHOD)
 
 min_wavelength = float("inf")
 max_wavelength = float("-inf")
