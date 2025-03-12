@@ -9,6 +9,7 @@ import os  # os file processing
 import argparse  # argument parser
 from mpi4py import MPI
 import math
+import traceback
 import matplotlib.pyplot as plt  # plots
 
 import numpy as np
@@ -48,7 +49,7 @@ figure_dpi = 100  # DPI of the picture
 
 # parse arguments
 parser = argparse.ArgumentParser(
-    prog="orca_uv", description="Easily plot absorption spectra from orca.out"
+    prog="orca_uv", description="Easily plot absorption spectra from orca.stdout"
 )
 
 # show the matplotlib window
@@ -123,6 +124,9 @@ def maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir):
     spectrum_file_dft = path_dft + '/' + dir + '/' + "orca.stdout"
     spectrum_file_ccsd = path_ccsd + '/' + dir + '/' + "orca.stdout"
 
+    wavelengthlist_dft = []
+    wavelengthlist_ccsd = []
+
     # open a file
     # check existence
     try:
@@ -130,10 +134,10 @@ def maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir):
     # file not found -> exit here
     except IOError:
         print(f"'{spectrum_file_dft}'" + " not found", flush=True)
-        return
+        return wavelengthlist_dft, wavelengthlist_ccsd
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
-        return
+        print(f"Rank {comm_rank} encountered Exception for {dir} in tddft output: {e}, {e.args}. Traceback: {traceback.format_exc()}", flush=True)
+        return wavelengthlist_dft, wavelengthlist_ccsd
 
     # open a file
     # check existence
@@ -142,10 +146,10 @@ def maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir):
     # file not found -> exit here
     except IOError:
         print(f"'{spectrum_file_ccsd}'" + " not found", flush=True)
-        return
+        return wavelengthlist_dft, wavelengthlist_ccsd
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
-        return
+        print(f"Rank {comm_rank} encountered Exception for {dir} in eomccsd output: {e}, {e.args}. Traceback: {traceback.format_exc()}", flush=True)
+        return wavelengthlist_dft, wavelengthlist_ccsd
 
     return wavelengthlist_dft, wavelengthlist_ccsd
 
@@ -184,8 +188,9 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
 
         wavelengthlist_dft, wavelengthlist_ccsd = maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir)
 
-        maximum_wavelength_dft_list.append(wavelengthlist_dft[0])
-        maximum_wavelength_ccsd_list.append(wavelengthlist_ccsd[0])
+        if len(wavelengthlist_dft) > 0 and len(wavelengthlist_ccsd) > 0:
+            maximum_wavelength_dft_list.append(wavelengthlist_dft[0])
+            maximum_wavelength_ccsd_list.append(wavelengthlist_ccsd[0])
 
     # Compute 2D histogram
     bins = [50, 50]  # Number of bins in x and y directions
