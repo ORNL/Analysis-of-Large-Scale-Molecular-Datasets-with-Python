@@ -205,7 +205,7 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
 
     # Add labels and title
     plt.xlabel("TD-DFT values (nm)")
-    plt.ylabel("EOC-CCSD values (nm)")
+    plt.ylabel("EOM-CCSD values (nm)")
     plt.title("Maximum Absorption Wavelength")
     plt.xlim([100.0, 500])
     plt.ylim([100.0, 500])
