@@ -196,12 +196,17 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
     idx = z.argsort()
     x2, y2, z2 = [maximum_wavelength_dft_list[i] for i in idx.flatten().tolist()], [maximum_wavelength_ccsd_list[i] for i in idx.flatten().tolist()], [z[i] for i in idx.flatten().tolist()]
 
+    # Increase title spacing
+    plt.rcParams['axes.titlepad'] = 20  # Adjust the value as needed
+
+    plt.figure(figsize=(10, 6))  # width=10 inches, height=6 inches
+
     plt.scatter(maximum_wavelength_dft_list, maximum_wavelength_ccsd_list, c=z2, cmap='viridis', s=20)
 
     # Add labels and title
-    plt.xlabel("TD-DFT")
-    plt.ylabel("EOC-CCSD")
-    plt.title("Maximum Absorption Wavelength (nm)")
+    plt.xlabel("TD-DFT values (nm)")
+    plt.ylabel("EOC-CCSD values (nm)")
+    plt.title("Maximum Absorption Wavelength")
     plt.xlim([100.0, 500])
     plt.ylim([100.0, 500])
 
@@ -214,7 +219,9 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
     # Add a colorbar to show the scale
     plt.colorbar()
 
-    plt.show()
+    plt.draw()
+    plt.tight_layout()
+    plt.savefig("GDB9-EX-ORCA-DFT_vs_CCSD.png")
 
 
 if __name__ == "__main__":
