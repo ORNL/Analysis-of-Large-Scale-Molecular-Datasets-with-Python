@@ -1,0 +1,24 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Analysis of Large Scale Molecular Datasets - ORNL
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Massimiliano
+    family-names: Lupo Pasini
+    affiliation: Oak Ridge National Laboratory
+    orcid: 'https://orcid.org/0000-0002-4980-6924'
+  - given-names: Kshitij
+    family-names: Mehta
+    affiliation: Oak Ridge National Laboratory
+    orcid: 'https://orcid.org/0000-0002-9714-9981'
+identifiers:
+  - type: url
+    value: >-
+      https://github.com/ORNL/Analysis-of-Large-Scale-Molecular-Datasets-with-Python
+repository-code: >-
+  https://github.com/ORNL/Analysis-of-Large-Scale-Molecular-Datasets-with-Python
