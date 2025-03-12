@@ -131,6 +131,7 @@ def read_orca_output(spectrum_file, specstring_start, specstring_end):
     # global lists
     statelist = list()  # mode
     energylist = list()  # energy cm-1
+    wavelengthlist = list()  # wavelength nm
     intenslist = list()  # fosc
     # open a file
     # check existence
@@ -150,9 +151,10 @@ def read_orca_output(spectrum_file, specstring_start, specstring_end):
                     if re.search("\d\s{1,}\d", line):
                         statelist.append(int(line.strip().split()[0]))
                         energylist.append(float(line.strip().split()[1]))
+                        wavelengthlist.append(float(line.strip().split()[2]))
                         intenslist.append(float(line.strip().split()[3]))
 
-    return statelist, energylist, intenslist
+    return statelist, energylist, wavelengthlist, intenslist
 
 
 def generate_graphdata(pdb_file_name):

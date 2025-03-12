@@ -9,7 +9,10 @@ import os  # os file processing
 import argparse  # argument parser
 from mpi4py import MPI
 import math
+import traceback
 import matplotlib.pyplot as plt  # plots
+
+import numpy as np
 
 from utils import nsplit, read_orca_output, draw_2Dmols, PlotOptions, plot_spectrum
 
@@ -18,13 +21,8 @@ plt.rcParams.update({"font.size": 22})
 # global constants
 found_uv_section = False  # check for uv data in out
 specstring_start = 'ABSORPTION SPECTRUM VIA TRANSITION ELECTRIC DIPOLE MOMENTS'  # check orca.out from here
-
-ORCA_METHOD = "EOM-CCSD"
-
-if ORCA_METHOD == "TD-DFT":
-    specstring_end = 'ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS'  # stop reading orca.out from here
-elif ORCA_METHOD == "EOM-CCSD":
-    specstring_end = "CD SPECTRUM" # stop reading orca.out from here
+specstring_end_dft = 'ABSORPTION SPECTRUM VIA TRANSITION VELOCITY DIPOLE MOMENTS'  # stop reading orca.out from here
+specstring_end_ccsd = "CD SPECTRUM" # stop reading orca.out from here
 
 w_wn = 1000  # w = line width for broadening - wave numbers, FWHM
 w_nm = 10  # w = line width for broadening - nm, FWHM
@@ -51,7 +49,7 @@ figure_dpi = 100  # DPI of the picture
 
 # parse arguments
 parser = argparse.ArgumentParser(
-    prog="orca_uv", description="Easily plot absorption spectra from orca.out"
+    prog="orca_uv", description="Easily plot absorption spectra from orca.stdout"
 )
 
 # show the matplotlib window
@@ -116,79 +114,52 @@ save_spectrum = args.nosave
 export_spectrum = args.export
 save_moldraw = args.mdraw
 
-PlotOptions_object = PlotOptions(nm_plot,
-                                 show_single_gauss,
-                                 show_single_gauss_area,
-                                 show_conv_spectrum,
-                                 show_sticks,
-                                 label_peaks,
-                                 x_label_nm,
-                                 x_label_eV,
-                                 y_label,
-                                 plt_y_lim,
-                                 minor_ticks,
-                                 linear_locator,
-                                 spectrum_title_weight,
-                                 show_grid,
-                                 show_spectrum,
-                                 save_spectrum,
-                                 export_spectrum,
-                                 figure_dpi,
-                                 export_delim,
-                                 ORCA_METHOD)
-
 min_wavelength = float("inf")
 max_wavelength = float("-inf")
 
-def smooth_spectrum(comm, path, dir, min_energy, max_energy, min_wavelength, max_wavelength):
+def maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir):
     comm_size = comm.Get_size()
     comm_rank = comm.Get_rank()
 
-    if nm_plot:
-        spectrum_discretization_step = 0.02
-        xmin_spectrum = 0.0  # could be min_wavelength
-        xmax_spectrum = 750  # could be max_wavelength
-    else:
-        spectrum_discretization_step = 0.01
-        xmin_spectrum = 0.0  # could be min_energy
-        xmax_spectrum = math.ceil(max_energy) + spectrum_discretization_step
+    spectrum_file_dft = path_dft + '/' + dir + '/' + "orca.stdout"
+    spectrum_file_ccsd = path_ccsd + '/' + dir + '/' + "orca.stdout"
 
-    spectrum_file = path + '/' + dir + '/' + "orca.stdout"
+    wavelengthlist_dft = []
+    wavelengthlist_ccsd = []
 
     # open a file
     # check existence
     try:
-        statelist, energylist, wavelengthlist, intenslist = read_orca_output(spectrum_file, specstring_start, specstring_end)
-
+        statelist_dft, energylist_dft, wavelengthlist_dft, intenslist_dft = read_orca_output(spectrum_file_dft, specstring_start, specstring_end_dft)
     # file not found -> exit here
     except IOError:
-        print(f"'{spectrum_file}'" + " not found", flush=True)
-        return
+        print(f"'{spectrum_file_dft}'" + " not found", flush=True)
+        return wavelengthlist_dft, wavelengthlist_ccsd
     except Exception as e:
-        print("Rank: ", comm_rank, " encountered Exception: ", e, e.args)
-        return
+        print(f"Rank {comm_rank} encountered Exception for {dir} in tddft output: {e}, {e.args}. Traceback: {traceback.format_exc()}", flush=True)
+        return wavelengthlist_dft, wavelengthlist_ccsd
 
-    if nm_plot:
-        # convert wave number to nm for nm plot
-        #energylist = [1 / wn * 10 ** 7 for wn in energylist]
-        valuelist = wavelengthlist
-        w = w_nm  # use line width for nm axis
-    else:
-        valuelist = energylist
-        w = w_wn  # use line width for wave number axis
+    # open a file
+    # check existence
+    try:
+        statelist_ccsd, energylist_ccsd, wavelengthlist_ccsd, intenslist_ccsd = read_orca_output(spectrum_file_ccsd, specstring_start, specstring_end_ccsd)
+    # file not found -> exit here
+    except IOError:
+        print(f"'{spectrum_file_ccsd}'" + " not found", flush=True)
+        return wavelengthlist_dft, wavelengthlist_ccsd
+    except Exception as e:
+        print(f"Rank {comm_rank} encountered Exception for {dir} in eomccsd output: {e}, {e.args}. Traceback: {traceback.format_exc()}", flush=True)
+        return wavelengthlist_dft, wavelengthlist_ccsd
 
-    # convert wave number to nm for nm plot
-    valuelist = energylist
-    valuelist.sort()
-    w = w_nm  # use line width for nm axis
+    return wavelengthlist_dft, wavelengthlist_ccsd
 
-    plot_spectrum(comm, path, dir, spectrum_file, xmin_spectrum, xmax_spectrum, spectrum_discretization_step, valuelist, w, intenslist, PlotOptions_object)
-
-
-def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavelength):
+def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_energy, min_wavelength, max_wavelength):
     comm.Barrier()
     comm_size = comm.Get_size()
     comm_rank = comm.Get_rank()
+
+    maximum_wavelength_dft_list = list()
+    maximum_wavelength_ccsd_list = list()
 
     if comm_rank == 0:
         print("=" * 50, flush=True)
@@ -197,7 +168,7 @@ def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavel
     comm.Barrier()
     dirs = None
     if comm_rank == 0:
-        dirs = [f.name for f in os.scandir(path) if f.is_dir()]
+        dirs = [f.name for f in os.scandir(path_ccsd) if f.is_dir()]
 
     dirs = comm.bcast(dirs, root=0)
     rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
@@ -205,24 +176,56 @@ def smooth_spectra(comm, path, min_energy, max_energy, min_wavelength, max_wavel
     count = 0
     for dir in sorted(dirs)[rx.start : rx.stop]:
         count = count + 1
-        print(
-            "s Rank: ",
-            comm_rank,
-            " - dir: ",
-            dir,
-            ", remaining: ",
-            total - count,
-            flush=True,
-        )
-        # collect information about molecular structure and chemical composition
-        if os.path.exists(path + "/" + dir + "/" + "orca.stdout"):
-            smooth_spectrum(
-                comm, path, dir, min_energy, max_energy, min_wavelength, max_wavelength
-            )
+        # print(
+        #     "s Rank: ",
+        #     comm_rank,
+        #     " - dir: ",
+        #     dir,
+        #     ", remaining: ",
+        #     total - count,
+        #     flush=True,
+        # )
+
+        wavelengthlist_dft, wavelengthlist_ccsd = maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir)
+
+        if len(wavelengthlist_dft) > 0 and len(wavelengthlist_ccsd) > 0:
+            maximum_wavelength_dft_list.append(wavelengthlist_dft[0])
+            maximum_wavelength_ccsd_list.append(wavelengthlist_ccsd[0])
+
+    # Compute 2D histogram
+    bins = [50, 50]  # Number of bins in x and y directions
+    hh, locx, locy = np.histogram2d(maximum_wavelength_dft_list, maximum_wavelength_ccsd_list, bins=bins)
+
+    # Sort points by density
+    z = np.array([hh[np.argmax(a <= locx[1:]), np.argmax(b <= locy[1:])] for a, b in zip(maximum_wavelength_dft_list, maximum_wavelength_ccsd_list)])
+    idx = z.argsort()
+    x2, y2, z2 = [maximum_wavelength_dft_list[i] for i in idx.flatten().tolist()], [maximum_wavelength_ccsd_list[i] for i in idx.flatten().tolist()], [z[i] for i in idx.flatten().tolist()]
+
+    plt.scatter(maximum_wavelength_dft_list, maximum_wavelength_ccsd_list, c=z2, cmap='viridis', s=20)
+
+    # Add labels and title
+    plt.xlabel("TD-DFT")
+    plt.ylabel("EOC-CCSD")
+    plt.title("Maximum Absorption Wavelength (nm)")
+    plt.xlim([100.0, 500])
+    plt.ylim([100.0, 500])
+
+    # Add a dashed diagonal line
+    plt.plot([100.0, 500], [100.0, 500], linestyle='--', color='red')
+
+    # Get the current axes and set the aspect ratio to equal
+    plt.gca().set_aspect('equal', adjustable='box')
+
+    # Add a colorbar to show the scale
+    plt.colorbar()
+
+    # plt.show()
+    plt.savefig('parity-spectrum.png', format='png', dpi=600, bbox_inches='tight')
 
 
 if __name__ == "__main__":
-    path = "./GDB-9-Ex-ORCA-EOM-CCSD-SUBSET-100"
+    path_dft = "./GDB-9-Ex-ORCA-TD-DFT-PBE0-SUBSET-100"
+    path_ccsd = "./GDB-9-Ex-ORCA-EOM-CCSD-SUBSET-100"
     min_energy = 0.0
     max_energy = 100.0
     min_wavelength = 0.0
@@ -230,8 +233,7 @@ if __name__ == "__main__":
 
     communicator = MPI.COMM_WORLD
 
-    draw_2Dmols(communicator, path, save_moldraw)
-    smooth_spectra(communicator, path, min_energy, max_energy, min_wavelength, max_wavelength)
+    maximum_wavelength_parity_plots(communicator, path_dft, path_ccsd, min_energy, max_energy, min_wavelength, max_wavelength)
 
     comm_size = communicator.Get_size()
     comm_rank = communicator.Get_rank()
