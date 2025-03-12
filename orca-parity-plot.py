@@ -168,7 +168,7 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
     comm.Barrier()
     dirs = None
     if comm_rank == 0:
-        dirs = [f.name for f in os.scandir(path_dft) if f.is_dir()]
+        dirs = [f.name for f in os.scandir(path_ccsd) if f.is_dir()]
 
     dirs = comm.bcast(dirs, root=0)
     rx = list(nsplit(range(len(dirs)), comm_size))[comm_rank]
