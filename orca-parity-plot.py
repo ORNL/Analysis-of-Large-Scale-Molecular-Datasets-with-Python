@@ -176,15 +176,15 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
     count = 0
     for dir in sorted(dirs)[rx.start : rx.stop]:
         count = count + 1
-        print(
-            "s Rank: ",
-            comm_rank,
-            " - dir: ",
-            dir,
-            ", remaining: ",
-            total - count,
-            flush=True,
-        )
+        # print(
+        #     "s Rank: ",
+        #     comm_rank,
+        #     " - dir: ",
+        #     dir,
+        #     ", remaining: ",
+        #     total - count,
+        #     flush=True,
+        # )
 
         wavelengthlist_dft, wavelengthlist_ccsd = maximum_wavelength_parity_plot(comm, path_dft, path_ccsd, dir)
 
