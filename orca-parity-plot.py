@@ -219,7 +219,8 @@ def maximum_wavelength_parity_plots(comm, path_dft, path_ccsd, min_energy, max_e
     # Add a colorbar to show the scale
     plt.colorbar()
 
-    plt.show()
+    # plt.show()
+    plt.savefig('parity-spectrum.png', format='png', dpi=600, bbox_inches='tight')
 
 
 if __name__ == "__main__":
